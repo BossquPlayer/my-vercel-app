@@ -10,38 +10,38 @@ let currentIndex = 0;
 // =======================
 // Ambil playlist dari server
 // =======================
-fetch("/playlist")
-  .then(res => res.json())
-  .then(data => {
+async function loadPlaylist() {
+  try {
+    const res = await fetch("/playlist");
+    const data = await res.json();
     daftarLagu = data;
+
+    const audioDiv = document.getElementById("playlist-audio");
+    const videoDiv = document.getElementById("playlist-video");
+    audioDiv.innerHTML = "";
+    videoDiv.innerHTML = "";
+
     data.forEach(file => {
       const item = document.createElement("div");
       item.className = "playlist-item";
 
-      // Icon sesuai jenis file
       let iconSVG = file.endsWith(".mp3")
         ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="#2196f3"><path d="M9 17V5h2v12H9zm4 0V5h2v12h-2z"/></svg>`
         : `<svg width="14" height="14" viewBox="0 0 24 24" fill="#2196f3"><path d="M4 4h16v16H4V4zm5 3v10l9-5-9-5z"/></svg>`;
 
       item.innerHTML = iconSVG + " " + file;
+      item.onclick = () => playFile(file);
 
-      // Klik item → putar
-      item.onclick = () => {
-        player.src = "/" + file;
-        player.play();
-        document.getElementById("infoLagu").innerText = file;
-        toggleLiveIndicator("active");
-      };
-
-      // Masukkan ke tab sesuai jenis
       if (file.endsWith(".mp3")) {
-        audioTab.appendChild(item);
+        audioDiv.appendChild(item);
       } else {
-        videoTab.appendChild(item);
+        videoDiv.appendChild(item);
       }
     });
-  })
-  .catch(err => console.error("Error fetch playlist:", err));
+  } catch (err) {
+    console.error("Error fetch playlist:", err);
+  }
+}
 
 // =======================
 // Kontrol Player
@@ -120,7 +120,6 @@ function tampilkanHasilSearch(query) {
       const item = document.createElement("div");
       item.className = "playlist-item";
 
-      // Highlight kata kunci
       const regex = new RegExp(`(${query})`, "gi");
       const highlighted = file.replace(regex, '<span class="highlight">$1</span>');
 
@@ -142,10 +141,9 @@ function openDonasi() {
   const modal = document.getElementById("donasiModal");
   modal.style.display = "block";
 
-  // Restart animasi setiap kali dibuka
   const content = modal.querySelector(".modal-content");
   content.style.animation = "none";
-  content.offsetHeight; // trigger reflow
+  content.offsetHeight;
   content.style.animation = "fadeSlideIn 0.6s forwards";
 }
 
@@ -153,86 +151,58 @@ function closeDonasi() {
   document.getElementById("donasiModal").style.display = "none";
 }
 
-async function loadPlaylist() {
-  try {
-    const res = await fetch("/playlist");
-    const data = await res.json();
-
-    // pisahkan audio & video
-    const audioDiv = document.getElementById("playlist-audio");
-    const videoDiv = document.getElementById("playlist-video");
-    audioDiv.innerHTML = "";
-    videoDiv.innerHTML = "";
-
-    data.forEach(item => {
-      if (item.endsWith(".mp3")) {
-        const btn = document.createElement("button");
-        btn.textContent = item;
-        btn.onclick = () => playMedia(item);
-        audioDiv.appendChild(btn);
-      } else {
-        const btn = document.createElement("button");
-        btn.textContent = item;
-        btn.onclick = () => playMedia(item);
-        videoDiv.appendChild(btn);
-      }
-    });
-  } catch (err) {
-    console.error("Gagal load playlist", err);
-  }
-}
-
-// panggil saat halaman load
-loadPlaylist();
-
-function playMedia(path) {
-  const player = document.getElementById("player");
-  if (path.endsWith(".mp3")) {
-    player.style.display = "none"; // sembunyikan video
-    document.getElementById("audioPlaceholder").style.display = "block";
-    const audio = new Audio(path);
-    audio.play();
-  } else {
-    document.getElementById("audioPlaceholder").style.display = "none";
-    player.style.display = "block";
-    player.src = path;
-    player.play();
-  }
-}
-
-// Mode bisa 'sandbox' atau 'live'
-let paypalMode = "sandbox"; 
-
-function setPaypalMode(mode) {
-  paypalMode = mode;
-  updatePaypalForm();
-}
-
-function updatePaypalForm() {
-  const form = document.getElementById("paypalForm");
-  const businessInput = document.getElementById("paypalBusiness");
-
-  if (paypalMode === "sandbox") {
-    form.action = "https://www.sandbox.paypal.com/donate";
-    businessInput.value = "YOUR_SANDBOX_MERCHANT_ID"; // ganti dengan Merchant ID sandbox
-  } else {
-    form.action = "https://www.paypal.com/donate";
-    businessInput.value = "YOUR_LIVE_MERCHANT_ID"; // ganti dengan Merchant ID asli
-  }
-}
-
-// Panggil saat halaman load
-updatePaypalForm();
-
+// =======================
+// Sidebar
+// =======================
 function toggleSidebar() {
   const sidebar = document.querySelector('.sidebar');
   const collapseBtn = document.querySelector('.collapse-btn');
   
   sidebar.classList.toggle('collapsed');
   
-  if (sidebar.classList.contains('collapsed')) {
-    collapseBtn.textContent = '➡️ Tampilkan Donasi';
-  } else {
-    collapseBtn.textContent = '⬅️ Sembunyikan Donasi';
+  collapseBtn.textContent = sidebar.classList.contains('collapsed')
+    ? '➡️ Tampilkan Donasi'
+    : '⬅️ Sembunyikan Donasi';
+}
+
+// =======================
+// Users API Integration
+// =======================
+async function loadUsers() {
+  try {
+    const res = await fetch("/api/users");
+    const data = await res.json();
+    const list = document.getElementById("users");
+    list.innerHTML = "";
+    data.forEach(user => {
+      const li = document.createElement("li");
+      li.textContent = `${user.id} - ${user.name}`;
+      list.appendChild(li);
+    });
+  } catch (err) {
+    console.error("Gagal load users:", err);
   }
 }
+
+async function addUser() {
+  const name = document.getElementById("newUserName").value;
+  if (!name) return alert("Isi nama dulu!");
+  try {
+    const res = await fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name })
+    });
+    await res.json();
+    document.getElementById("newUserName").value = "";
+    loadUsers();
+  } catch (err) {
+    console.error("Gagal tambah user:", err);
+  }
+}
+
+// =======================
+// Init
+// =======================
+loadPlaylist();
+loadUsers();
