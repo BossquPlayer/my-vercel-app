@@ -1,11 +1,41 @@
-// api/playlist.js
-export default function handler(req, res) {
-  // Contoh data playlist (bisa diganti dari database atau file JSON)
-  const playlist = [
-    { title: "Song A", artist: "Band X", url: "/music/song-a.mp3" },
-    { title: "Song B", artist: "Band Y", url: "/music/song-b.mp3" },
-    { title: "Song C", artist: "Band Z", url: "/music/song-c.mp3" }
-  ];
+<div id="audioPlaylist"></div>
+<div id="videoPlaylist"></div>
 
-  res.status(200).json({ playlist });
-}
+<script>
+  async function loadPlaylist() {
+    try {
+      const res = await fetch("/api/playlist");
+      const data = await res.json();
+
+      const audioDiv = document.getElementById("audioPlaylist");
+      const videoDiv = document.getElementById("videoPlaylist");
+
+      // Render audio
+      audioDiv.innerHTML = data.audio.map(item =>
+        `<div>
+           <button onclick="playMedia('${item.url}', 'audio')">${item.title}</button>
+         </div>`
+      ).join("");
+
+      // Render video
+      videoDiv.innerHTML = data.video.map(item =>
+        `<div>
+           <button onclick="playMedia('${item.url}', 'video')">${item.title}</button>
+         </div>`
+      ).join("");
+
+    } catch (err) {
+      console.error("Gagal load playlist:", err);
+    }
+  }
+
+  function playMedia(url, type) {
+    const player = document.getElementById("mediaPlayer");
+    player.src = url;
+    player.type = type === "audio" ? "audio/mp3" : "video/mp4";
+    player.play();
+  }
+
+  // Panggil saat halaman load
+  loadPlaylist();
+</script>
