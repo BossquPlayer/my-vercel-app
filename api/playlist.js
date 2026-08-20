@@ -1,41 +1,34 @@
-<div id="audioPlaylist"></div>
-<div id="videoPlaylist"></div>
+import fs from "fs";
+import path from "path";
 
-<script>
-  async function loadPlaylist() {
-    try {
-      const res = await fetch("/api/playlist");
-      const data = await res.json();
+export default function handler(req, res) {
+  try {
+    // folder audio & video
+    const audioDir = path.join(process.cwd(), "public", "music");
+    const videoDir = path.join(process.cwd(), "public", "video");
 
-      const audioDiv = document.getElementById("audioPlaylist");
-      const videoDiv = document.getElementById("videoPlaylist");
+    // baca file audio
+    const audioFiles = fs.readdirSync(audioDir)
+      .filter(f => f.endsWith(".mp3"))
+      .map(f => ({
+        title: f,
+        url: "/music/" + f
+      }));
 
-      // Render audio
-      audioDiv.innerHTML = data.audio.map(item =>
-        `<div>
-           <button onclick="playMedia('${item.url}', 'audio')">${item.title}</button>
-         </div>`
-      ).join("");
+    // baca file video
+    const videoFiles = fs.readdirSync(videoDir)
+      .filter(f => f.endsWith(".mp4"))
+      .map(f => ({
+        title: f,
+        url: "/video/" + f
+      }));
 
-      // Render video
-      videoDiv.innerHTML = data.video.map(item =>
-        `<div>
-           <button onclick="playMedia('${item.url}', 'video')">${item.title}</button>
-         </div>`
-      ).join("");
-
-    } catch (err) {
-      console.error("Gagal load playlist:", err);
-    }
+    res.status(200).json({
+      audio: audioFiles,
+      video: videoFiles
+    });
+  } catch (err) {
+    console.error("Error ambil playlist:", err);
+    res.status(500).json({ error: "Gagal ambil playlist" });
   }
-
-  function playMedia(url, type) {
-    const player = document.getElementById("mediaPlayer");
-    player.src = url;
-    player.type = type === "audio" ? "audio/mp3" : "video/mp4";
-    player.play();
-  }
-
-  // Panggil saat halaman load
-  loadPlaylist();
-</script>
+}
