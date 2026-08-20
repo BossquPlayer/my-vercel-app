@@ -1,22 +1,6 @@
 import fs from "fs";
 import path from "path";
 import { parseFile } from "music-metadata";
-import ffmpeg from "fluent-ffmpeg";
-import ffprobeStatic from "ffprobe-static";
-
-ffmpeg.setFfprobePath(ffprobeStatic.path);
-
-function getVideoMetadata(filePath) {
-  return new Promise((resolve, reject) => {
-    ffmpeg.ffprobe(filePath, (err, metadata) => {
-      if (err) return reject(err);
-      resolve({
-        duration: metadata.format.duration,
-        size: metadata.format.size
-      });
-    });
-  });
-}
 
 export default async function handler(req, res) {
   try {
@@ -32,27 +16,20 @@ export default async function handler(req, res) {
           return {
             title: metadata.common.title || f,
             artist: metadata.common.artist || "Unknown",
-            duration: metadata.format.duration, // detik
+            duration: metadata.format.duration, // dalam detik
             url: "/music/" + f
           };
         })
     );
 
-    // video
-    const videoFiles = await Promise.all(
-      fs.readdirSync(videoDir)
-        .filter(f => f.endsWith(".mp4"))
-        .map(async f => {
-          const filePath = path.join(videoDir, f);
-          const meta = await getVideoMetadata(filePath);
-          return {
-            title: f,
-            duration: meta.duration, // detik
-            size: meta.size,         // byte
-            url: "/video/" + f
-          };
-        })
-    );
+    // video (pakai fs.stat untuk ukuran, atau ffprobe untuk durasi)
+    const videoFiles = fs.readdirSync(videoDir)
+      .filter(f => f.endsWith(".mp4"))
+      .map(f => ({
+        title: f,
+        url: "/video/" + f
+        // durasi bisa ditambahkan dengan ffprobe
+      }));
 
     res.status(200).json({ audio: audioFiles, video: videoFiles });
   } catch (err) {
