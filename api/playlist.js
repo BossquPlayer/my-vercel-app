@@ -1,35 +1,39 @@
-import fs from "fs";
-import path from "path";
-import { parseFile } from "music-metadata";
+import { google } from "googleapis";
 
 export default async function handler(req, res) {
   try {
-    const audioDir = path.join(process.cwd(), "public", "music");
-    const videoDir = path.join(process.cwd(), "public", "video");
+    const auth = new google.auth.GoogleAuth({
+      keyFile: "credentials.json", // file service account
+      scopes: ["https://www.googleapis.com/auth/drive.readonly"],
+    });
 
-    // audio
-    const audioFiles = await Promise.all(
-      fs.readdirSync(audioDir)
-        .filter(f => f.endsWith(".mp3"))
-        .map(async f => {
-          const metadata = await parseFile(path.join(audioDir, f));
-          return {
-            title: metadata.common.title || f,
-            artist: metadata.common.artist || "Unknown",
-            duration: metadata.format.duration, // dalam detik
-            url: "/music/" + f
-          };
-        })
-    );
+    const drive = google.drive({ version: "v3", auth });
 
-    // video (pakai fs.stat untuk ukuran, atau ffprobe untuk durasi)
-    const videoFiles = fs.readdirSync(videoDir)
-      .filter(f => f.endsWith(".mp4"))
-      .map(f => ({
-        title: f,
-        url: "/video/" + f
-        // durasi bisa ditambahkan dengan ffprobe
-      }));
+    // Folder ID musik & video
+    const audioFolderId = "YOUR_AUDIO_FOLDER_ID";
+    const videoFolderId = "YOUR_VIDEO_FOLDER_ID";
+
+    // Ambil file audio
+    const audioRes = await drive.files.list({
+      q: `'${audioFolderId}' in parents`,
+      fields: "files(id, name, mimeType)",
+    });
+
+    const audioFiles = audioRes.data.files.map(f => ({
+      title: f.name,
+      url: `https://drive.google.com/uc?export=download&id=${f.id}`
+    }));
+
+    // Ambil file video
+    const videoRes = await drive.files.list({
+      q: `'${videoFolderId}' in parents`,
+      fields: "files(id, name, mimeType)",
+    });
+
+    const videoFiles = videoRes.data.files.map(f => ({
+      title: f.name,
+      url: `https://drive.google.com/uc?export=download&id=${f.id}`
+    }));
 
     res.status(200).json({ audio: audioFiles, video: videoFiles });
   } catch (err) {
